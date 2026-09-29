@@ -1,0 +1,9 @@
+pyTelegramBotAPI==4.37.0
+requests==2.34.2
+psycopg2-binary==2.9.13
+aiohttp==3.14.3
+edge-tts==7.2.8
+gTTS==2.5.4
+Pillow==12.3.0
+jdatetime==6.1.0
+beautifulsoup4==4.15.0

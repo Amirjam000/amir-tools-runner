@@ -1,0 +1,51 @@
+name: Amir Tools 24/7 Engine Runner
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual restart'
+        required: false
+        default: 'Manual trigger'
+  schedule:
+    # Auto-refresh watchdog every 4 hours
+    - cron: '0 */4 * * *'
+
+concurrency:
+  group: amir-tools-engine
+  cancel-in-progress: true
+
+jobs:
+  run-bot:
+    name: Execute Bot Engine
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg curl ca-certificates
+
+      - name: Install Python Dependencies
+        run: |
+          pip install --no-cache-dir -r requirements.txt
+
+      - name: Run Amir Tools Engine
+        env:
+          PYTHONUNBUFFERED: "1"
+          GITHUB_ACTIONS: "true"
+        run: |
+          echo "Starting Amir Tools Bot Engine on GitHub Actions runner..."
+          python -u app.py
