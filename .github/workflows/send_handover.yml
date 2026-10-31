@@ -1,0 +1,31 @@
+name: Send Handover Document to Telegram
+
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for sending doc'
+        required: false
+        default: 'Manual send handover doc'
+  push:
+    paths:
+      - 'send_doc.py'
+
+jobs:
+  send-doc:
+    name: Generate and Send Document
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Requests
+        run: pip install requests
+
+      - name: Execute send_doc.py
+        run: python send_doc.py
