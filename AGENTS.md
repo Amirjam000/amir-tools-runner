@@ -34,7 +34,7 @@ graph TD
     Orchestrator --> DevOps["🛠️ DevOps & Server Agent"]
     Orchestrator --> FileHunter["🔍 Autonomous Web File Hunter"]
     Orchestrator --> Artist["🎨 Visual Artist Agent (Flux.1 / SDXL)"]
-    Orchestrator --> Research["📊 Deep Research & Market Agent"]
+    Orchestrator --> Research["📊 Deep Research (DuckDuckGo duck.go) & Market Agent"]
     Orchestrator --> Media["🎬 Multimedia & Podcast Agent"]
 ```
 
@@ -64,7 +64,7 @@ graph TD
    - Multi-model rendering: Flux.1 Schnell, Flux Realism, and SDXL Lightning.
    - Inline keyboard for switching styles (Photorealistic 8K, Anime, Cyberpunk, 3D Pixar).
 
-5. **Deep Research & Financial Agent:**
+5. **Deep Research (DuckDuckGo duck.go) & Financial Agent:**
    - Live market rates: Dollar (Free Market, Nima, Remittance), Euro, Gold, Coins, and Crypto.
    - Live web search and news synthesis with clickable source citations.
 
