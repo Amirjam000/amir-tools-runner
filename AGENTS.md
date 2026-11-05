@@ -24,7 +24,13 @@ Amir Tools is an enterprise-grade Telegram Multi-Agent Swarm and Utility Bot bui
 
 ---
 
-## 2. Multi-Agent Swarm Roles & Capabilities
+## 2. Multi-Agent Swarm Roles & Capabilities (Full OOP ReAct Rewrite)
+
+The bot operates on a modernized, modular ReAct Multi-Agent Swarm inside AgentContext and 
+un_hermes_agent():
+- **AgentContext**: Encapsulates user intent, real-time dynamic thinking, token tracking, and structured step-by-step trace generation.
+- **LiveThinkingContext**: Thread-safe dynamic ticker updating 💭 Thinking\n{elapsed}s · reasoning... in real-time.
+- **Unified Telegram 8.0+ UI**: Every response seamlessly outputs <blockquote expandable>{elapsed}s • ⚡ {tokens} • 💻 مراحل کار\n...</blockquote> with actual execution steps.
 
 The bot operates on a multi-agent routing system inside `run_hermes_agent()`:
 
