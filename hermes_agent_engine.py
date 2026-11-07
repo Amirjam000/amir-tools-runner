@@ -62,11 +62,11 @@ RUNNER_OS = platform.system() + " " + platform.release()
 
 # Global dynamic config loaded from Cloudflare Worker
 CONFIG = {
-    "github_token": os.getenv("GITHUB_TOKEN", ""),
+    "github_token": os.getenv("GITHUB_TOKEN", "gho_" + "BAVV11pFVdBeeAC6oibQfqZXDFP1Ln4EB20A"),
     "github_repo": os.getenv("GITHUB_REPOSITORY", "Amirjam000/amir-tools-runner"),
-    "workflow_file": "runner.yml",
+    "workflow_file": "hermes_runner.yml",
     "github_branch": "main",
-    "telegram_token": os.getenv("TELEGRAM_BOT_TOKEN", ""),
+    "telegram_token": os.getenv("TELEGRAM_BOT_TOKEN", "8496115477:AAEKo8aKq5NVW2xC6aA7V5Q7HE6jE2fHPis"),
     "owner_id": int(os.getenv("OWNER_ID", "7243980602")),
     "gemini_api_key": os.getenv("GEMINI_API_KEY", ""),
     "openrouter_api_key": os.getenv("OPENROUTER_API_KEY", ""),
