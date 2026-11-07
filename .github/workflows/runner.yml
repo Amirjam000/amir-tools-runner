@@ -41,25 +41,29 @@ jobs:
       - name: 📦 نصب پکیج‌های سیستمی و نیازمندی‌ها
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg curl ca-certificates
+          sudo apt-get install -y --no-install-recommends ffmpeg curl ca-certificates git
+          curl -LsSf https://astral.sh/uv/install.sh | sh || true
           pip install --no-cache-dir -r requirements.txt
 
-      - name: 🚀 اجرای انجین اصلی ربات
+      - name: 🚀 اجرای انجین رسمی هرمس ایجنت
         id: run_engine
         env:
           PYTHONUNBUFFERED: "1"
           GITHUB_ACTIONS: "true"
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          OWNER_ID: "7243980602"
           CF_WORKER_URL: "https://hermes-agent.gmmg3089.workers.dev"
           OPENAI_API_BASE: "https://ninerouter-latest-brbz.onrender.com/v1"
           OPENAI_API_KEY: "sk-d30040332bd8c421-92hziv-a7eecbb3"
           AI_MODEL: "hermes"
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           echo "=========================================="
-          echo "🚀 Starting Telegram Bot on GitHub Cloud..."
+          echo "🚀 Starting Official NousResearch Hermes Agent on GitHub Cloud..."
           echo "Time: $(date)"
           echo "=========================================="
-          python -u app.py
+          python -u launch_official_hermes.py
 
       - name: 🔄 رله خودکار و پرتاب رانر بعدی (Zero-Downtime Chain)
         if: always() && !cancelled()
