@@ -66,7 +66,7 @@ CONFIG = {
     "github_repo": os.getenv("GITHUB_REPOSITORY", "Amirjam000/amir-tools-runner"),
     "workflow_file": "hermes_runner.yml",
     "github_branch": "main",
-    "telegram_token": os.getenv("TELEGRAM_BOT_TOKEN", "8496115477:AAEKo8aKq5NVW2xC6aA7V5Q7HE6jE2fHPis"),
+    "telegram_token": os.getenv("TELEGRAM_BOT_TOKEN", "9238269625:AAEVhFLsnBh1RcQjomsaZNab21GppBrMlvQ"),
     "owner_id": int(os.getenv("OWNER_ID", "7243980602")),
     "openai_api_base": os.getenv("OPENAI_API_BASE", "https://ninerouter-latest-brbz.onrender.com/v1"),
     "openai_api_key": os.getenv("OPENAI_API_KEY", "sk-d30040332bd8c421-92hziv-a7eecbb3"),
