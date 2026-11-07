@@ -54,8 +54,10 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           OWNER_ID: "7243980602"
           CF_WORKER_URL: "https://hermes-agent.gmmg3089.workers.dev"
-          OPENAI_API_BASE: "https://ninerouter-latest-brbz.onrender.com/v1"
+          OPENAI_API_BASE: "https://hermes-agent.gmmg3089.workers.dev/v1"
+          OPENAI_BASE_URL: "https://hermes-agent.gmmg3089.workers.dev/v1"
           OPENAI_API_KEY: "sk-d30040332bd8c421-92hziv-a7eecbb3"
+          HERMES_YOLO_MODE: "true"
           AI_MODEL: "hermes"
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |

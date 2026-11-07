@@ -8,8 +8,11 @@ https://hermes-agent.nousresearch.com/
 Features:
 1. 30s Heartbeat Daemon to Cloudflare Edge Worker (/api/heartbeat)
 2. 340-Minute Preemptive Auto-Relay (Zero-Downtime Chain Turnover)
-3. Automatic Configuration of ~/.hermes/config.yaml and ~/.hermes/.env
-4. Multi-tier Bootstrap:
+3. Cloudflare Edge OpenAI Reverse Proxy (Bypasses Render Datacenter 403 Forbidden)
+4. Full Internet Terminal Execution & DuckDuckGo Search (ddgs)
+5. Automatic YOLO Auto-Approval Mode (HERMES_YOLO_MODE=true)
+6. Automatic Configuration of ~/.hermes/config.yaml and ~/.hermes/.env
+7. Multi-tier Bootstrap:
    - Tier 1: Official installer (curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash)
    - Tier 2: Direct clone of NousResearch/hermes-agent & uv gateway run
    - Tier 3: Seamless fallback to high-availability native Hermes engine (app.py)
@@ -54,8 +57,9 @@ USER_HOME = Path.home()
 HERMES_HOME = USER_HOME / ".hermes"
 HERMES_REPO_DIR = HERMES_HOME / "hermes-agent"
 
-# Credentials from environment or defaults
-OPENAI_BASE_URL = os.getenv("OPENAI_API_BASE") or "https://ninerouter-latest-brbz.onrender.com/v1"
+# Point OpenAI Base URL to Cloudflare Edge Proxy to bypass Render datacenter 403 blocks
+CF_PROXY_BASE_URL = f"{CF_WORKER_URL}/v1"
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE") or CF_PROXY_BASE_URL
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or "sk-d30040332bd8c421-92hziv-a7eecbb3"
 AI_MODEL = os.getenv("AI_MODEL") or "hermes"
 
@@ -109,12 +113,10 @@ def auto_relay_daemon():
         elapsed = time.time() - START_TIME
         if elapsed >= RELAY_THRESHOLD_SEC:
             print("⚡ [AUTO-RELAY TRIGGER] Host reached 340m uptime. Dispatching successor runner...", flush=True)
-            # 1. Notify Cloudflare Worker
             try:
                 requests.post(f"{CF_WORKER_URL}/api/trigger", json={"reason": "340m Routine Turnover"}, timeout=15)
             except Exception:
                 pass
-            # 2. Direct GitHub Actions dispatch
             try:
                 gh_url = f"https://api.github.com/repos/{GH_REPO}/actions/workflows/runner.yml/dispatches"
                 requests.post(
@@ -153,6 +155,7 @@ TELEGRAM_BOT_TOKEN={TELEGRAM_TOKEN}
 TELEGRAM_ALLOWED_USERS={OWNER_ID}
 TELEGRAM_ALLOW_ALL_USERS=true
 HERMES_MODEL={AI_MODEL}
+HERMES_YOLO_MODE=true
 """
     env_file = HERMES_HOME / ".env"
     with open(env_file, "w", encoding="utf-8") as f:
@@ -171,6 +174,15 @@ model:
   provider: "custom"
   base_url: "{OPENAI_BASE_URL}"
   api_key: "{OPENAI_API_KEY}"
+
+terminal:
+  backend: "local"
+  timeout: 180
+
+web:
+  backend: "ddgs"
+  search_backend: "ddgs"
+  extract_backend: "ddgs"
 
 platforms:
   telegram:
@@ -209,6 +221,7 @@ def launch_official_hermes():
     env_vars["OPENAI_API_BASE"] = OPENAI_BASE_URL
     env_vars["OPENAI_BASE_URL"] = OPENAI_BASE_URL
     env_vars["OPENAI_API_KEY"] = OPENAI_API_KEY
+    env_vars["HERMES_YOLO_MODE"] = "true"
     env_vars["TELEGRAM_BOT_TOKEN"] = TELEGRAM_TOKEN
     env_vars["TELEGRAM_ALLOWED_USERS"] = str(OWNER_ID)
     env_vars["TELEGRAM_ALLOW_ALL_USERS"] = "true"
@@ -225,7 +238,6 @@ def launch_official_hermes():
         )
         if install_res.returncode == 0:
             print("✅ Official install script completed successfully!", flush=True)
-            # Find hermes executable
             hermes_exe = None
             candidate_paths = [
                 str(USER_HOME / ".local" / "bin" / "hermes"),

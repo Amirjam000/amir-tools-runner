@@ -35,8 +35,8 @@ BOT_TOKEN = os.getenv("BOT_TOKEN") or "9238269625:AAEVhFLsnBh1RcQjomsaZNab21GppB
 OWNER_ID = int(os.getenv("OWNER_ID") or "7243980602")
 CF_WORKER_URL = os.getenv("CF_WORKER_URL") or "https://hermes-agent.gmmg3089.workers.dev"
 
-# تنظیمات پیش‌فرض هوش مصنوعی ناین‌روتر هرمس
-NINEROUTER_BASE_URL = os.getenv("OPENAI_API_BASE") or "https://ninerouter-latest-brbz.onrender.com/v1"
+# تنظیمات پیش‌فرض هوش مصنوعی ناین‌روتر هرمس (پراکسی لبه کلودفلر جهت رفع ۴۰۳ رندر)
+NINEROUTER_BASE_URL = os.getenv("OPENAI_BASE_URL") or os.getenv("OPENAI_API_BASE") or f"{CF_WORKER_URL}/v1"
 NINEROUTER_API_KEY = os.getenv("OPENAI_API_KEY") or "sk-d30040332bd8c421-92hziv-a7eecbb3"
 AI_MODEL = os.getenv("AI_MODEL") or "hermes"
 
@@ -139,6 +139,27 @@ def send_ping(message):
         chat_id=message.chat.id,
         message_id=msg.message_id
     )
+
+@bot.message_handler(commands=['sh', 'bash', 'cmd', 'terminal'])
+def handle_terminal_command(message):
+    if str(message.from_user.id) != str(OWNER_ID):
+        bot.reply_to(message, "⛔ دسترسی محدود به ادمین است.")
+        return
+    cmd = message.text.partition(' ')[2].strip()
+    if not cmd:
+        bot.reply_to(message, "⚠️ لطفاً دستور را ارسال کنید. مثال:\n<code>/sh curl -s https://api.ipify.org</code>")
+        return
+    bot.send_chat_action(message.chat.id, "typing")
+    try:
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=30)
+        out = (res.stdout + "\n" + res.stderr).strip() or "(خروجی خالی - کد خروج 0)"
+        if len(out) > 3500: out = out[:3500] + "... (خلاصه شد)"
+        escaped_out = out.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+        bot.reply_to(message, f"💻 <b>خروجی ترمینال (Exit: {res.returncode}):</b>\n<pre>{escaped_out}</pre>")
+    except subprocess.TimeoutExpired:
+        bot.reply_to(message, "⏱ زمان اجرای دستور به پایان رسید (Timeout 30s).")
+    except Exception as e:
+        bot.reply_to(message, f"❌ خطا در اجرای دستور: {e}")
 
 @bot.message_handler(commands=['status'])
 def send_status(message):
