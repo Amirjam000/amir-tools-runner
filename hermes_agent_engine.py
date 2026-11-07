@@ -68,11 +68,12 @@ CONFIG = {
     "github_branch": "main",
     "telegram_token": os.getenv("TELEGRAM_BOT_TOKEN", "8496115477:AAEKo8aKq5NVW2xC6aA7V5Q7HE6jE2fHPis"),
     "owner_id": int(os.getenv("OWNER_ID", "7243980602")),
+    "openai_api_base": os.getenv("OPENAI_API_BASE", "https://ninerouter-latest-brbz.onrender.com/v1"),
+    "openai_api_key": os.getenv("OPENAI_API_KEY", "sk-d30040332bd8c421-92hziv-a7eecbb3"),
+    "ai_model": os.getenv("AI_MODEL", "hermes"),
     "gemini_api_key": os.getenv("GEMINI_API_KEY", ""),
     "openrouter_api_key": os.getenv("OPENROUTER_API_KEY", ""),
-    "openai_api_key": os.getenv("OPENAI_API_KEY", ""),
-    "groq_api_key": os.getenv("GROQ_API_KEY", ""),
-    "ai_model": os.getenv("AI_MODEL", "gemini-2.5-flash")
+    "groq_api_key": os.getenv("GROQ_API_KEY", "")
 }
 
 IS_RUNNING = True
@@ -330,13 +331,43 @@ def ask_hermes_ai(prompt, system_prompt=None):
     prompt = str(prompt).strip()
     if not prompt: return "لطفاً پیام خود را وارد نمایید."
 
-    sys_p = system_prompt or "You are Hermes Agent, an autonomous sovereign AI running on a high-availability GitHub Actions 6-Hour Runner with Cloudflare Edge Watchdog. Respond helpfully, smartly, and accurately."
+    sys_p = system_prompt or "You are Hermes Agent, an autonomous sovereign AI running on a high-availability GitHub Actions 6-Hour Runner with Cloudflare Edge Watchdog. Respond helpfully, smartly, and accurately in Persian or English based on the prompt."
 
-    # 1. Try Google Gemini API
+    # 1. Primary: Custom OpenAI-compatible / NineRouter Hermes API
+    ai_base = CONFIG.get("openai_api_base") or "https://ninerouter-latest-brbz.onrender.com/v1"
+    ai_key = CONFIG.get("openai_api_key") or "sk-d30040332bd8c421-92hziv-a7eecbb3"
+    ai_model = CONFIG.get("ai_model") or "hermes"
+
+    if ai_key:
+        try:
+            target_url = ai_base.rstrip("/") + "/chat/completions"
+            payload = {
+                "model": ai_model,
+                "messages": [
+                    {"role": "system", "content": sys_p},
+                    {"role": "user", "content": prompt}
+                ]
+            }
+            resp = requests.post(
+                target_url,
+                json=payload,
+                headers={"Authorization": f"Bearer {ai_key}", "Content-Type": "application/json"},
+                timeout=45
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                if text: return text.strip()
+            else:
+                log(f"NineRouter AI HTTP {resp.status_code}: {resp.text[:100]}", "WARN")
+        except Exception as e_nine:
+            log(f"NineRouter AI error: {e_nine}", "WARN")
+
+    # 2. Fallback: Google Gemini API
     gem_key = CONFIG.get("gemini_api_key")
     if gem_key:
         try:
-            model = CONFIG.get("ai_model") or "gemini-2.5-flash"
+            model = CONFIG.get("ai_model") if CONFIG.get("ai_model") != "hermes" else "gemini-2.5-flash"
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={gem_key}"
             payload = {
                 "contents": [{"parts": [{"text": prompt}]}],
