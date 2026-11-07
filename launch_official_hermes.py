@@ -181,6 +181,16 @@ platforms:
     extra:
       allow_all: true
       owner_id: {OWNER_ID}
+      status_indicator: true
+      status_online: "🟢 Online"
+      status_offline: "🔴 Offline"
+      drop_pending_on_cold_boot: false
+      max_concurrent_updates: 32
+
+display:
+  platforms:
+    telegram:
+      notifications: important
 """
     config_file = HERMES_HOME / "config.yaml"
     with open(config_file, "w", encoding="utf-8") as f:
