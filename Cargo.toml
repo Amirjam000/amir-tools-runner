@@ -1,18 +1,12 @@
 [package]
 name = "amir_tools_bot"
-version = "4.5.0"
+version = "5.0.0"
 edition = "2021"
 authors = ["Amirjam000 <7243980602>"]
-description = "Enterprise Telegram Bot & Autonomous Hermes Multi-Agent Swarm written in High-Performance Rust"
+description = "100% Faithful Port of Amir Tools Telegram Bot Python Engine to High-Performance Rust"
 
 [dependencies]
 tokio = { version = "1.38", features = ["full"] }
-reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+reqwest = { version = "0.12", features = ["json"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-regex = "1.10"
-chrono = "0.4"
-url = "2.5"
-urlencoding = "2.1"
-rand = "0.8"
-futures-util = "0.3"
