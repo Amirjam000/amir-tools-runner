@@ -1,4 +1,4 @@
-name: Amir Tools 24/7 Engine Runner (Rust Edition)
+name: Amir Tools 24/7 Engine Runner
 
 on:
   push:
@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   run-bot:
-    name: Execute Bot Engine (Rust 24/7)
+    name: Execute Bot Engine (Python 24/7)
     runs-on: ubuntu-latest
     timeout-minutes: 350
 
@@ -31,39 +31,31 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🦀 Setup Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
 
-      - name: ⚡ Rust Cache (Ultra-Fast Compilation)
-        uses: Swatinem/rust-cache@v2
-
-      - name: 📦 Install System Dependencies
+      - name: Fast Install Dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev ffmpeg curl ca-certificates iputils-ping
+          sudo apt-get install -y --no-install-recommends ffmpeg curl ca-certificates
+          pip install -r requirements.txt
 
-      - name: 🔨 Build Rust High-Performance Binary
-        run: |
-          echo "🔨 Compiling Amir Tools Pure Rust Engine v5.0 with Cargo..."
-          cargo build --release
-
-      - name: 🚀 Run Amir Tools Pure Rust Engine (24/7 Zero-Downtime)
+      - name: Run Amir Tools Engine
         id: run_engine
         env:
-          RUST_LOG: "info"
+          PYTHONUNBUFFERED: "1"
           GITHUB_ACTIONS: "true"
-          BOT_TOKEN: "8496115477:AAEKo8aKq5NVW2xC6aA7V5Q7HE6jE2fHPis"
-          OWNER_ID: "7243980602"
-          CF_WORKER_URL: "https://hermes-agent.gmmg3089.workers.dev"
         run: |
           echo "=========================================================="
-          echo "🦀 Launching Pure Rust Enterprise Bot Engine on Cloud..."
+          echo "🚀 Starting Amir Tools Original Engine on GitHub Runner..."
           echo "Time: $(date)"
           echo "=========================================================="
-          chmod +x ./target/release/amir_tools_bot
-          ./target/release/amir_tools_bot
+          python -u app.py
 
-      - name: 🔄 Auto-Relay Successor Runner (Zero-Downtime Chain)
+      - name: Auto-Relay Successor Runner (Zero-Downtime Chain)
         if: always() && !cancelled()
         run: |
           echo "🔄 Relay Trigger: Dispatching next runner immediately to eliminate downtime..."
