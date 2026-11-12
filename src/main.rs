@@ -260,7 +260,7 @@ impl HermesTools {
         let elapsed = t0.elapsed();
         match out {
             Ok(res) => {
-                let stdout = String::from_utf8_lossy(&res.stdout);
+                let _stdout = String::from_utf8_lossy(&res.stdout);
                 steps.push("دریافت پاسخ‌ها و تحلیل زمان رفت و برگشت (RTT)".into());
                 steps.push(format!("محاسبه میانگین تاخیر و پکت‌لاس در {:.1}s", elapsed.as_secs_f32()));
                 
@@ -298,8 +298,9 @@ impl HermesTools {
         let clean = domain.trim().replace("http://", "").replace("https://", "").split('/').next().unwrap_or(domain).to_string();
         steps.push(format!("کاوش و تحلیل رکوردهای نام دامنه (DNS) برای: <code>{}</code>", clean));
 
-        let addr_str = format!("{}:80", clean);
-        match tokio::net::lookup_host(&addr_str).await {
+        let host_port = format!("{}:80", clean);
+        let lookup_res = tokio::net::lookup_host(host_port).await;
+        match lookup_res {
             Ok(addrs) => {
                 let ips: Vec<String> = addrs.map(|a| a.ip().to_string()).collect();
                 steps.push(format!("استخراج {} رکورد آی‌پی اختصاصی هاست", ips.len()));
@@ -484,14 +485,14 @@ impl HermesTools {
         steps.push("استعلام زنده قیمت طلا، سکه و ارز از بازار تهران".into());
         steps.push("محاسبه نرخ برابری تتر (USDT) و رمزارزهای پایه".into());
 
-        let report = (
-            "💹 <b>نرخ‌های لحظه‌ای بازار طلا، ارز و کریپتو:</b>\n\n"
-            "• دلار آزاد تهران: <b>۸۴,۶۵۰ تومان</b>\n"
-            "• یورو: <b>۹۱,۲۰۰ تومان</b>\n"
-            "• طلای ۱۸ عیار: <b>۴,۶۸۰,۰۰۰ تومان</b>\n"
-            "• سکه تمام بهار آزادی: <b>۴۴,۳۰۰,۰۰۰ تومان</b>\n"
-            "• سکه امامی (طرح جدید): <b>۵۰,۴۰۰,۰۰۰ تومان</b>\n"
-            "• تتر (USDT): <b>۸۵,۱۰۰ تومان</b>\n"
+        let report = concat!(
+            "💹 <b>نرخ‌های لحظه‌ای بازار طلا، ارز و کریپتو:</b>\n\n",
+            "• دلار آزاد تهران: <b>۸۴,۶۵۰ تومان</b>\n",
+            "• یورو: <b>۹۱,۲۰۰ تومان</b>\n",
+            "• طلای ۱۸ عیار: <b>۴,۶۸۰,۰۰۰ تومان</b>\n",
+            "• سکه تمام بهار آزادی: <b>۴۴,۳۰۰,۰۰۰ تومان</b>\n",
+            "• سکه امامی (طرح جدید): <b>۵۰,۴۰۰,۰۰۰ تومان</b>\n",
+            "• تتر (USDT): <b>۸۵,۱۰۰ تومان</b>\n",
             "• بیت‌کوین (BTC): <b>$89,450</b>"
         ).to_string();
 
@@ -508,13 +509,15 @@ impl HermesTools {
         let time_str = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
 
         let diag = format!(
-            "🖥 <b>مشخصات سیستم ابری و هسته راست (Rust Engine v4.5):</b>\n\n"
-            "• انجین: <b>Rust 1.78+ (Tokio Async Runtime) 🦀</b>\n"
-            "• سیستم‌عامل سرور: <code>{}</code>\n"
-            "• وضعیت پردازش: <b>Zero-GC / Sub-Millisecond Dispatch ⚡</b>\n"
-            "• مصرف حافظه رم: <b>~6 MB (Super Light)</b>\n"
-            "• زمان سرور: <code>{}</code>\n"
-            "• نود فعال: <code>GitHub Actions 24/7 Cloud Runner</code>",
+            concat!(
+                "🖥 <b>مشخصات سیستم ابری و هسته راست (Rust Engine v4.5):</b>\n\n",
+                "• انجین: <b>Rust 1.78+ (Tokio Async Runtime) 🦀</b>\n",
+                "• سیستم‌عامل سرور: <code>{}</code>\n",
+                "• وضعیت پردازش: <b>Zero-GC / Sub-Millisecond Dispatch ⚡</b>\n",
+                "• مصرف حافظه رم: <b>~6 MB (Super Light)</b>\n",
+                "• زمان سرور: <code>{}</code>\n",
+                "• نود فعال: <code>GitHub Actions 24/7 Cloud Runner</code>"
+            ),
             os_info, time_str
         );
 
@@ -612,14 +615,14 @@ pub async fn handle_incoming_message(bot: Arc<TelegramBot>, msg: Message) {
             ],
         };
 
-        let welcome_html = (
-            "🚀 <b>به سیستم خودمختار هرمس (Hermes Rust Engine v4.5) خوش آمدید!</b>\n\n"
-            "این ربات با جدیدترین نسخه زبان <b>Rust 🦀</b> بازنویسی شده و مجهز به تمام قابلیت‌های مدرن تلگرام است:\n"
-            "• پیام‌های جمع‌شونده هوشمند (<code>&lt;blockquote expandable&gt;</code>)\n"
-            "• افکت‌های متحرک پیام (<code>MessageEffect: 🔥 🎉</code>)\n"
-            "• نقل‌قول‌های پیشرفته (<code>ReplyParameters + Quote</code>)\n"
-            "• تنظیمات پیش‌نمایش لینک (<code>LinkPreviewOptions</code>)\n"
-            "• استدلال زنجیره‌ای و حل چندمرحله‌ای وظایف\n\n"
+        let welcome_html = concat!(
+            "🚀 <b>به سیستم خودمختار هرمس (Hermes Rust Engine v4.5) خوش آمدید!</b>\n\n",
+            "این ربات با جدیدترین نسخه زبان <b>Rust 🦀</b> بازنویسی شده و مجهز به تمام قابلیت‌های مدرن تلگرام است:\n",
+            "• پیام‌های جمع‌شونده هوشمند (<code>&lt;blockquote expandable&gt;</code>)\n",
+            "• افکت‌های متحرک پیام (<code>MessageEffect: 🔥 🎉</code>)\n",
+            "• نقل‌قول‌های پیشرفته (<code>ReplyParameters + Quote</code>)\n",
+            "• تنظیمات پیش‌نمایش لینک (<code>LinkPreviewOptions</code>)\n",
+            "• استدلال زنجیره‌ای و حل چندمرحله‌ای وظایف\n\n",
             "💡 <i>کافیست در گروه یا پی‌وی به زبان فارسی بنویسید (مثلاً: «پینگ گوگل رو بگیر» یا «هوای مشهد چطوره»)</i>"
         );
 

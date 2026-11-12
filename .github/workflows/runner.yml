@@ -40,14 +40,16 @@ jobs:
       - name: 📦 Install System Dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg curl ca-certificates iputils-ping
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev ffmpeg curl ca-certificates iputils-ping python3 python3-pip python3-setuptools
+          python3 -m pip install --break-system-packages -r requirements.txt || pip install -r requirements.txt || true
 
       - name: 🔨 Build Rust High-Performance Binary
+        continue-on-error: true
         run: |
           echo "🔨 Compiling Amir Tools Hermes Bot Engine with Cargo..."
           cargo build --release
 
-      - name: 🚀 Run Amir Tools Engine (Rust Native 24/7)
+      - name: 🚀 Run Amir Tools Engine (Dual Rust / Python Zero-Downtime 24/7)
         id: run_engine
         env:
           RUST_LOG: "info"
@@ -55,11 +57,20 @@ jobs:
           BOT_TOKEN: "8496115477:AAEKo8aKq5NVW2xC6aA7V5Q7HE6jE2fHPis"
         run: |
           echo "=========================================================="
-          echo "🚀 Launching Native Rust Telegram Engine on GitHub Cloud..."
+          echo "🚀 Starting Amir Tools Telegram Engine on GitHub Cloud..."
           echo "Time: $(date)"
           echo "=========================================================="
-          chmod +x ./target/release/amir_tools_bot
-          ./target/release/amir_tools_bot
+          if [ -f "./target/release/amir_tools_bot" ]; then
+            echo "🦀 Starting Native Rust Engine (v4.5)..."
+            chmod +x ./target/release/amir_tools_bot
+            ./target/release/amir_tools_bot || {
+              echo "⚠️ Rust engine exited. Launching Python fallback engine..."
+              python3 -u app.py
+            }
+          else
+            echo "⚠️ Native binary build was skipped or failed. Launching Python engine..."
+            python3 -u app.py
+          fi
 
       - name: 🔄 Auto-Relay Successor Runner (Zero-Downtime Chain)
         if: always() && !cancelled()
