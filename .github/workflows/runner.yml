@@ -40,37 +40,28 @@ jobs:
       - name: 📦 Install System Dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev ffmpeg curl ca-certificates iputils-ping python3 python3-pip python3-setuptools
-          python3 -m pip install --break-system-packages -r requirements.txt || pip install -r requirements.txt || true
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libssl-dev ffmpeg curl ca-certificates iputils-ping
 
       - name: 🔨 Build Rust High-Performance Binary
-        continue-on-error: true
         run: |
-          echo "🔨 Compiling Amir Tools Hermes Bot Engine with Cargo..."
+          echo "🔨 Compiling Amir Tools Pure Rust Engine v5.0 with Cargo..."
           cargo build --release
 
-      - name: 🚀 Run Amir Tools Engine (Dual Rust / Python Zero-Downtime 24/7)
+      - name: 🚀 Run Amir Tools Pure Rust Engine (24/7 Zero-Downtime)
         id: run_engine
         env:
           RUST_LOG: "info"
           GITHUB_ACTIONS: "true"
           BOT_TOKEN: "8496115477:AAEKo8aKq5NVW2xC6aA7V5Q7HE6jE2fHPis"
+          OWNER_ID: "7243980602"
+          CF_WORKER_URL: "https://hermes-agent.gmmg3089.workers.dev"
         run: |
           echo "=========================================================="
-          echo "🚀 Starting Amir Tools Telegram Engine on GitHub Cloud..."
+          echo "🦀 Launching Pure Rust Enterprise Bot Engine on Cloud..."
           echo "Time: $(date)"
           echo "=========================================================="
-          if [ -f "./target/release/amir_tools_bot" ]; then
-            echo "🦀 Starting Native Rust Engine (v4.5)..."
-            chmod +x ./target/release/amir_tools_bot
-            ./target/release/amir_tools_bot || {
-              echo "⚠️ Rust engine exited. Launching Python fallback engine..."
-              python3 -u app.py
-            }
-          else
-            echo "⚠️ Native binary build was skipped or failed. Launching Python engine..."
-            python3 -u app.py
-          fi
+          chmod +x ./target/release/amir_tools_bot
+          ./target/release/amir_tools_bot
 
       - name: 🔄 Auto-Relay Successor Runner (Zero-Downtime Chain)
         if: always() && !cancelled()
