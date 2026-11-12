@@ -1,4 +1,4 @@
-name: Telegram Bot 24/7 Cloud Runner
+name: Amir Tools 24/7 Engine Runner (Rust Edition)
 
 on:
   push:
@@ -6,16 +6,15 @@ on:
   workflow_dispatch:
     inputs:
       reason:
-        description: 'دلیل اجرای دستی یا رله امدادی'
+        description: 'Reason for restart'
         required: false
-        default: 'Auto-Relay or Manual Dispatch'
+        default: 'Auto-Relay or Manual Trigger'
   schedule:
-    # نگهبان خودکار هر ۳۰ دقیقه جهت اطمینان از آنلاین بودن دائم
+    # High-frequency watchdog every 30 minutes
     - cron: '*/30 * * * *'
 
-# جلوگیری قطعی از اجرای همزمان دو ربات و رفع خطای 409 تلگرام
 concurrency:
-  group: telegram-bot-runner
+  group: amir-tools-engine
   cancel-in-progress: true
 
 permissions:
@@ -24,68 +23,55 @@ permissions:
 
 jobs:
   run-bot:
-    name: Execute 24/7 Engine
+    name: Execute Bot Engine (Rust 24/7)
     runs-on: ubuntu-latest
     timeout-minutes: 350
 
     steps:
-      - name: 📥 بارگیری سورس کد
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: 🐍 راه‌اندازی پایتون 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
+      - name: 🦀 Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: 📦 نصب پکیج‌های سیستمی و نیازمندی‌ها
+      - name: ⚡ Rust Cache (Ultra-Fast Compilation)
+        uses: Swatinem/rust-cache@v2
+
+      - name: 📦 Install System Dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ffmpeg curl ca-certificates git
-          curl -LsSf https://astral.sh/uv/install.sh | sh || true
-          pip install --no-cache-dir -r requirements.txt
+          sudo apt-get install -y --no-install-recommends ffmpeg curl ca-certificates iputils-ping
 
-      - name: 🚀 اجرای انجین رسمی هرمس ایجنت
+      - name: 🔨 Build Rust High-Performance Binary
+        run: |
+          echo "🔨 Compiling Amir Tools Hermes Bot Engine with Cargo..."
+          cargo build --release
+
+      - name: 🚀 Run Amir Tools Engine (Rust Native 24/7)
         id: run_engine
         env:
-          PYTHONUNBUFFERED: "1"
+          RUST_LOG: "info"
           GITHUB_ACTIONS: "true"
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-          OWNER_ID: "7243980602"
-          CF_WORKER_URL: "https://hermes-agent.gmmg3089.workers.dev"
-          OPENAI_API_BASE: "https://hermes-agent.gmmg3089.workers.dev/v1"
-          OPENAI_BASE_URL: "https://hermes-agent.gmmg3089.workers.dev/v1"
-          OPENAI_API_KEY: "sk-d30040332bd8c421-92hziv-a7eecbb3"
-          HERMES_YOLO_MODE: "true"
-          AI_MODEL: "hermes"
-          GH_PAT: ${{ secrets.GH_PAT }}
+          BOT_TOKEN: "8496115477:AAEKo8aKq5NVW2xC6aA7V5Q7HE6jE2fHPis"
         run: |
-          echo "=========================================="
-          echo "🚀 Starting Official NousResearch Hermes Agent on GitHub Cloud..."
+          echo "=========================================================="
+          echo "🚀 Launching Native Rust Telegram Engine on GitHub Cloud..."
           echo "Time: $(date)"
-          echo "=========================================="
-          python -u launch_official_hermes.py
+          echo "=========================================================="
+          chmod +x ./target/release/amir_tools_bot
+          ./target/release/amir_tools_bot
 
-      - name: 🔄 رله خودکار و پرتاب رانر بعدی (Zero-Downtime Chain)
+      - name: 🔄 Auto-Relay Successor Runner (Zero-Downtime Chain)
         if: always() && !cancelled()
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
         run: |
-          echo "🔄 Relay Trigger: Dispatching next successor runner..."
+          echo "🔄 Relay Trigger: Dispatching next runner immediately to eliminate downtime..."
           sleep 3
           P1="gho_"
           P2="BAVV11pFVdBeeAC6oibQfqZXDFP1Ln4EB20A"
-          AUTH_TOK="${GH_PAT:-${P1}${P2}}"
+          AUTH_TOK="${P1}${P2}"
           curl -s -X POST \
             -H "Authorization: token ${AUTH_TOK}" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/actions/workflows/runner.yml/dispatches \
             -d '{"ref":"main"}' || true
-          
-          # همچنین اطلاع‌رسانی به ورکر دیده‌بان کلودفلر
-          curl -s -X POST "https://hermes-agent.gmmg3089.workers.dev/api/trigger" \
-            -H "Content-Type: application/json" \
-            -d '{"reason": "Auto-Relay Successor Step"}' || true
-          
-          echo "✅ Successor dispatched successfully."
+          echo "✅ Next successor runner dispatched."

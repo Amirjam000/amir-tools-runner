@@ -1,0 +1,16 @@
+[package]
+name = "amir_tools_bot"
+version = "4.5.0"
+edition = "2021"
+authors = ["Amirjam000 <7243980602>"]
+description = "Enterprise Telegram Bot & Autonomous Hermes Multi-Agent Swarm written in High-Performance Rust"
+
+[dependencies]
+tokio = { version = "1.38", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+regex = "1.10"
+chrono = "0.4"
+url = "2.5"
+futures-util = "0.3"
