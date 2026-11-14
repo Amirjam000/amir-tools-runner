@@ -37,6 +37,9 @@ if [ ! -d "$INSTALL_DIR/venv" ]; then
 fi
 "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
 "$INSTALL_DIR/venv/bin/pip" install --upgrade -r "$INSTALL_DIR/requirements.txt" yt-dlp
+echo "🌐 Installing Headless Chromium for Autonomous Browser Agent..."
+"$INSTALL_DIR/venv/bin/python" -m playwright install-deps chromium || true
+"$INSTALL_DIR/venv/bin/python" -m playwright install chromium || true
 
 # 4. Create & Start systemd service immediately so Bot is LIVE right now!
 echo "⚡ [4/5] Starting Amir Tools Bot systemd service..."
