@@ -9,10 +9,9 @@ use std::collections::HashSet;
 use std::env;
 use std::fs::File;
 use std::io::Write;
-use std::net::ToSocketAddrs;
 use std::path::Path;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-use tokio::net::TcpStream;
+use tokio::net::{lookup_host, TcpStream};
 
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36";
 
@@ -93,14 +92,14 @@ impl Sha256 {
         let mut g = self.state[6];
         let mut h = self.state[7];
 
-        for i in 0..64 {
+        for (&k_val, &w_val) in Self::K.iter().zip(w.iter()) {
             let s1 = e.rotate_right(6) ^ e.rotate_right(11) ^ e.rotate_right(25);
             let ch = (e & f) ^ ((!e) & g);
             let temp1 = h
                 .wrapping_add(s1)
                 .wrapping_add(ch)
-                .wrapping_add(Self::K[i])
-                .wrapping_add(w[i]);
+                .wrapping_add(k_val)
+                .wrapping_add(w_val);
             let s0 = a.rotate_right(2) ^ a.rotate_right(13) ^ a.rotate_right(22);
             let maj = (a & b) ^ (a & c) ^ (b & c);
             let temp2 = s0.wrapping_add(maj);
@@ -174,6 +173,22 @@ fn build_client(timeout_secs: u64) -> Client {
         .user_agent(USER_AGENT)
         .timeout(Duration::from_secs(timeout_secs))
         .redirect(reqwest::redirect::Policy::limited(6))
+        .build()
+        .unwrap_or_else(|_| Client::new())
+}
+
+/// Client for large binary downloads.
+/// `.timeout()` in reqwest is a TOTAL deadline that includes streaming the body, so a 30s value
+/// killed every download that took longer than 30s. Here we use a connect timeout + an idle
+/// read timeout (time between chunks) and a generous total ceiling scaled by the size limit.
+fn build_download_client(max_size_mb: u64) -> Client {
+    let total = (max_size_mb.saturating_mul(6)).clamp(120, 1800);
+    Client::builder()
+        .user_agent(USER_AGENT)
+        .connect_timeout(Duration::from_secs(12))
+        .read_timeout(Duration::from_secs(45))
+        .timeout(Duration::from_secs(total))
+        .redirect(reqwest::redirect::Policy::limited(8))
         .build()
         .unwrap_or_else(|_| Client::new())
 }
@@ -256,8 +271,18 @@ fn resolve_relative_url(base_url: &str, href: &str) -> Option<String> {
 // ──────────────────── STREAMING FILE DOWNLOADER ────────────────────
 
 async fn stream_download_file(url: &str, out_dir: &str, max_size_mb: u64, preferred_ext: &str) -> DownloadResult {
+    stream_download_file_with_deadline(url, out_dir, max_size_mb, preferred_ext, None).await
+}
+
+async fn stream_download_file_with_deadline(
+    url: &str,
+    out_dir: &str,
+    max_size_mb: u64,
+    preferred_ext: &str,
+    deadline: Option<Instant>,
+) -> DownloadResult {
     let t0 = Instant::now();
-    let client = build_client(30);
+    let client = build_download_client(max_size_mb);
     let _ = std::fs::create_dir_all(out_dir);
 
     let clean_path = url.split('?').next().unwrap_or(url);
@@ -389,7 +414,13 @@ async fn stream_download_file(url: &str, out_dir: &str, max_size_mb: u64, prefer
         }
     }
 
-    let filepath_buf = Path::new(out_dir).join(&filename);
+    let mut filepath_buf = Path::new(out_dir).join(&filename);
+    // Never silently overwrite a previously downloaded file with the same name
+    if filepath_buf.exists() {
+        let ts = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis();
+        filename = format!("{}_{}", ts, filename);
+        filepath_buf = Path::new(out_dir).join(&filename);
+    }
     let filepath = filepath_buf.to_string_lossy().to_string();
 
     let mut file = match File::create(&filepath_buf) {
@@ -439,6 +470,22 @@ async fn stream_download_file(url: &str, out_dir: &str, max_size_mb: u64, prefer
                     }
                 }
                 total_bytes += chunk.len() as u64;
+                if deadline.is_some_and(|d| Instant::now() >= d) {
+                    drop(file);
+                    let _ = std::fs::remove_file(&filepath_buf);
+                    return DownloadResult {
+                        success: false,
+                        filename,
+                        filepath,
+                        size_bytes: total_bytes,
+                        size_mb: (total_bytes as f64) / (1024.0 * 1024.0),
+                        sha256: String::new(),
+                        time_taken: t0.elapsed().as_secs_f64(),
+                        url: url.to_string(),
+                        content_type,
+                        error: "Download deadline reached (too slow)".to_string(),
+                    };
+                }
                 if total_bytes > max_bytes {
                     drop(file);
                     let _ = std::fs::remove_file(&filepath_buf);
@@ -632,12 +679,10 @@ async fn hunt_files_on_web(query: &str, explicit_ext: &str, out_dir: &str) -> se
                 posts
             }));
         }
-        for res in join_all(m_futs).await {
-            if let Ok(posts) = res {
-                for p in posts {
-                    if !p.contains("/category/") {
-                        landing_pages.push(p);
-                    }
+        for posts in join_all(m_futs).await.into_iter().flatten() {
+            for p in posts {
+                if !p.contains("/category/") {
+                    landing_pages.push(p);
                 }
             }
         }
@@ -738,13 +783,11 @@ async fn hunt_files_on_web(query: &str, explicit_ext: &str, out_dir: &str) -> se
         }));
     }
 
-    for res in join_all(ddg_futs).await {
-        if let Ok((d_list, p_list)) = res {
-            direct_candidates.extend(d_list);
-            for p in p_list {
-                if landing_pages.len() < 8 {
-                    landing_pages.push(p);
-                }
+    for (d_list, p_list) in join_all(ddg_futs).await.into_iter().flatten() {
+        direct_candidates.extend(d_list);
+        for p in p_list {
+            if landing_pages.len() < 8 {
+                landing_pages.push(p);
             }
         }
     }
@@ -761,10 +804,8 @@ async fn hunt_files_on_web(query: &str, explicit_ext: &str, out_dir: &str) -> se
             }));
         }
     }
-    for res in join_all(crawl_futs).await {
-        if let Ok(links) = res {
-            direct_candidates.extend(links);
-        }
+    for links in join_all(crawl_futs).await.into_iter().flatten() {
+        direct_candidates.extend(links);
     }
 
     // Deduplicate and rank candidates (exact extension match first)
@@ -785,10 +826,16 @@ async fn hunt_files_on_web(query: &str, explicit_ext: &str, out_dir: &str) -> se
     exact_matches.extend(other_matches);
     let ranked_candidates = exact_matches;
 
-    // 7. Try downloading the top candidates (up to 4 tries) until a verified binary file succeeds
+    // 7. Try downloading the top candidates (up to 4 tries) until a verified binary file succeeds.
+    //    The whole hunt is bounded by a deadline (Python bridge waits 150s) so we never get killed
+    //    mid-stream and leave partial files behind.
+    let hunt_deadline = t0 + Duration::from_secs(135);
     let mut downloaded_res: Option<DownloadResult> = None;
     for cand_url in ranked_candidates.iter().take(4) {
-        let dl = stream_download_file(cand_url, out_dir, 50, &ext).await;
+        if Instant::now() + Duration::from_secs(8) >= hunt_deadline {
+            break;
+        }
+        let dl = stream_download_file_with_deadline(cand_url, out_dir, 50, &ext, Some(hunt_deadline)).await;
         if dl.success {
             downloaded_res = Some(dl);
             break;
@@ -915,6 +962,13 @@ async fn rust_web_search(query: &str, max_results: usize) -> serde_json::Value {
 
 // ──────────────────── NETWORK & DEVOPS TOOLS IN RUST ────────────────────
 
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Value {
     let client = build_client(8);
     let clean_target = target
@@ -924,34 +978,38 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
         .split('/')
         .next()
         .unwrap_or(target.trim());
+    let host_only = if !clean_target.starts_with('[') && clean_target.matches(':').count() == 1 {
+        clean_target.split(':').next().unwrap_or(clean_target)
+    } else {
+        clean_target.trim_start_matches('[').split("]:").next().unwrap_or(clean_target).trim_end_matches(']')
+    };
 
     match mode {
         "port" => {
-            let port: u16 = extra.parse().unwrap_or(80);
-            let addr = format!("{}:{}", clean_target, port);
+            let port: u16 = extra.trim().parse().unwrap_or(80);
             let t0 = Instant::now();
-            match tokio::time::timeout(Duration::from_secs(4), TcpStream::connect(&addr)).await {
+            match tokio::time::timeout(Duration::from_secs(4), TcpStream::connect((host_only, port))).await {
                 Ok(Ok(_stream)) => {
                     let ms = (t0.elapsed().as_secs_f64() * 1000.0 * 10.0).round() / 10.0;
                     json!({
                         "ok": true,
                         "open": true,
                         "latency_ms": ms,
-                        "report": format!("🟢 پورت <code>{}</code> روی میزبان <code>{}</code> <b>باز (OPEN)</b> است.\n⚡️ زمان هندشیک TCP (موتور Rust): <b>{} ms</b>", port, clean_target, ms)
+                        "report": format!("🟢 پورت <code>{}</code> روی میزبان <code>{}</code> <b>باز (OPEN)</b> است.\n⚡️ زمان هندشیک TCP (موتور Rust): <b>{} ms</b>", port, escape_html(host_only), ms)
                     })
                 }
                 _ => {
                     json!({
                         "ok": true,
                         "open": false,
-                        "report": format!("🔴 پورت <code>{}</code> روی میزبان <code>{}</code> <b>بسته (CLOSED / FILTERED)</b> است یا فایروال مانع اتصال شد.", port, clean_target)
+                        "report": format!("🔴 پورت <code>{}</code> روی میزبان <code>{}</code> <b>بسته (CLOSED / FILTERED)</b> است یا فایروال مانع اتصال شد.", port, escape_html(host_only))
                     })
                 }
             }
         }
         "dns" => {
             let mut ips = Vec::new();
-            if let Ok(addrs) = (clean_target, 80u16).to_socket_addrs() {
+            if let Ok(Ok(addrs)) = tokio::time::timeout(Duration::from_secs(4), lookup_host((host_only, 80u16))).await {
                 for a in addrs {
                     let ip_s = a.ip().to_string();
                     if !ips.contains(&ip_s) {
@@ -959,41 +1017,46 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                     }
                 }
             }
-            let doh_url = format!("https://dns.google/resolve?name={}&type=ANY", urlencoding::encode(clean_target));
             let mut records = Vec::new();
-            if let Ok(r) = client.get(&doh_url).send().await {
-                if let Ok(v) = r.json::<serde_json::Value>().await {
-                    if let Some(ans) = v.get("Answer").and_then(|a| a.as_array()) {
-                        for rec in ans.iter().take(8) {
-                            let d = rec.get("data").and_then(|x| x.as_str()).unwrap_or("");
-                            let t = rec.get("type").and_then(|x| x.as_u64()).unwrap_or(0);
-                            let t_name = match t {
-                                1 => "A",
-                                2 => "NS",
-                                5 => "CNAME",
-                                15 => "MX",
-                                16 => "TXT",
-                                28 => "AAAA",
-                                _ => "REC",
-                            };
-                            if !d.is_empty() {
-                                records.push(format!("• [{}] <code>{}</code>", t_name, d));
+            for rtype in ["ANY", "A"] {
+                let doh_url = format!("https://dns.google/resolve?name={}&type={}", urlencoding::encode(host_only), rtype);
+                if let Ok(r) = client.get(&doh_url).send().await {
+                    if let Ok(v) = r.json::<serde_json::Value>().await {
+                        if let Some(ans) = v.get("Answer").and_then(|a| a.as_array()) {
+                            for rec in ans.iter().take(8) {
+                                let d = rec.get("data").and_then(|x| x.as_str()).unwrap_or("");
+                                let t = rec.get("type").and_then(|x| x.as_u64()).unwrap_or(0);
+                                let t_name = match t {
+                                    1 => "A",
+                                    2 => "NS",
+                                    5 => "CNAME",
+                                    15 => "MX",
+                                    16 => "TXT",
+                                    28 => "AAAA",
+                                    _ => "REC",
+                                };
+                                if !d.is_empty() {
+                                    records.push(format!("• [{}] <code>{}</code>", t_name, escape_html(d)));
+                                }
                             }
                         }
                     }
                 }
+                if !records.is_empty() {
+                    break;
+                }
             }
-            let ip_list = if ips.is_empty() { "یافت نشد".to_string() } else { ips.join(" , ") };
+            let ip_list = if ips.is_empty() { "یافت نشد".to_string() } else { escape_html(&ips.join(" , ")) };
             let rec_list = if records.is_empty() { String::new() } else { format!("\n\n📋 <b>رکوردهای DNS:</b>\n{}", records.join("\n")) };
             json!({
                 "ok": true,
                 "ips": ips,
-                "report": format!("🌐 <b>تحلیل DNS دامنه (Rust Engine):</b> <code>{}</code>\n📍 آدرس‌های IP: <code>{}</code>{}", clean_target, ip_list, rec_list)
+                "report": format!("🌐 <b>تحلیل DNS دامنه (Rust Engine):</b> <code>{}</code>\n📍 آدرس‌های IP: <code>{}</code>{}", escape_html(host_only), ip_list, rec_list)
             })
         }
         "http" => {
-            let url = if target.starts_with("http://") || target.starts_with("https://") {
-                target.to_string()
+            let url = if target.trim().starts_with("http://") || target.trim().starts_with("https://") {
+                target.trim().to_string()
             } else {
                 format!("https://{}", target.trim())
             };
@@ -1010,13 +1073,13 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                         "latency_ms": ms,
                         "report": format!(
                             "🌐 <b>بررسی سلامت وب‌سایت (Rust Engine):</b>\n• آدرس: <code>{}</code>\n• وضعیت HTTP: <b>{} {}</b>\n• زمان پاسخ: <b>{} ms</b>\n• وب‌سرور: <code>{}</code>",
-                            url, status, reason, ms, srv
+                            escape_html(&url), status, escape_html(reason), ms, escape_html(&srv)
                         )
                     })
                 }
                 Err(e) => json!({
                     "ok": false,
-                    "report": format!("❌ خطا در اتصال به <code>{}</code>: {}", url, e)
+                    "report": format!("❌ خطا در اتصال به <code>{}</code>: {}", escape_html(&url), escape_html(&e.to_string()))
                 }),
             }
         }
@@ -1039,13 +1102,13 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                             "ok": true,
                             "report": format!(
                                 "🌤 <b>وضعیت زنده آب‌وهوای {} (Rust Engine):</b>\n\n• 🌡 <b>دما:</b> <code>{}°C</code> (دمای محسوس: <code>{}°C</code>)\n• ☁️ <b>آسمان:</b> {}\n• 💧 <b>رطوبت:</b> <code>{}%</code>\n• 💨 <b>سرعت باد:</b> <code>{} km/h</code>",
-                                city, temp_c, feels, desc, hum, wind
+                                escape_html(city), escape_html(temp_c), escape_html(feels), escape_html(desc), escape_html(hum), escape_html(wind)
                             )
                         });
                     }
                 }
             }
-            json!({"ok": false, "report": format!("⚠️ اطلاعات آب و هوای {} دریافت نشد.", city)})
+            json!({"ok": false, "report": format!("⚠️ اطلاعات آب و هوای {} دریافت نشد.", escape_html(city))})
         }
         "wiki" => {
             let term = target.trim();
@@ -1062,9 +1125,9 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                         .and_then(|x| x.as_str())
                         .unwrap_or("");
                     if !extract.is_empty() {
-                        let mut rep = format!("📚 <b>دانشنامه ویکی‌پدیا ({}) [Rust Engine]:</b>\n\n{}", title, extract);
+                        let mut rep = format!("📚 <b>دانشنامه ویکی‌پدیا ({}) [Rust Engine]:</b>\n\n{}", escape_html(title), escape_html(extract));
                         if !page_url.is_empty() {
-                            rep.push_str(&format!("\n\n🔗 <a href=\"{}\">مطالعه مقاله کامل در ویکی‌پدیا</a>", page_url));
+                            rep.push_str(&format!("\n\n🔗 <a href=\"{}\">مطالعه مقاله کامل در ویکی‌پدیا</a>", escape_html(page_url)));
                         }
                         return json!({"ok": true, "report": rep});
                     }
@@ -1078,7 +1141,7 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                 .unwrap_or_default();
             json!({
                 "ok": !snips.is_empty(),
-                "report": if snips.is_empty() { format!("مقاله‌ای برای «{}» یافت نشد.", term) } else { format!("📚 <b>خلاصه دانشنامه برای «{}»:</b>\n\n{}", term, snips) }
+                "report": if snips.is_empty() { format!("مقاله‌ای برای «{}» یافت نشد.", escape_html(term)) } else { format!("📚 <b>خلاصه دانشنامه برای «{}»:</b>\n\n{}", escape_html(term), escape_html(&snips)) }
             })
         }
         _ => json!({"ok": false, "report": "Unknown net mode"}),
