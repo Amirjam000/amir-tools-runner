@@ -628,7 +628,7 @@ async fn crawl_landing_page_for_files(client: Client, page_url: String, preferre
 
 // ──────────────────── AUTONOMOUS WEB FILE HUNTER ────────────────────
 
-async fn hunt_files_on_web(query: &str, explicit_ext: &str, out_dir: &str) -> serde_json::Value {
+async fn hunt_files_on_web(query: &str, explicit_ext: &str, out_dir: &str, max_size_mb: u64) -> serde_json::Value {
     let t0 = Instant::now();
     let ext = detect_file_extension(query, explicit_ext);
     let re_prefix = Regex::new(r"^(?:سرچ کن|پیدا کن|دانلود کن|دانلود فایل|دانلود کتاب|دانلود آهنگ|دانلود اهنگ|دانلود برنامه|دانلود|فایل|کتاب|آهنگ|اهنگ|برنامه|بگرد دنبال)\s*").unwrap();
@@ -827,15 +827,15 @@ async fn hunt_files_on_web(query: &str, explicit_ext: &str, out_dir: &str) -> se
     let ranked_candidates = exact_matches;
 
     // 7. Try downloading the top candidates (up to 4 tries) until a verified binary file succeeds.
-    //    The whole hunt is bounded by a deadline (Python bridge waits 150s) so we never get killed
-    //    mid-stream and leave partial files behind.
-    let hunt_deadline = t0 + Duration::from_secs(135);
+    //    Scale deadline with max_size_mb so >50MB and >100MB admin/user downloads complete cleanly.
+    let hunt_secs = (max_size_mb.saturating_mul(4)).clamp(135, 900);
+    let hunt_deadline = t0 + Duration::from_secs(hunt_secs);
     let mut downloaded_res: Option<DownloadResult> = None;
     for cand_url in ranked_candidates.iter().take(4) {
         if Instant::now() + Duration::from_secs(8) >= hunt_deadline {
             break;
         }
-        let dl = stream_download_file_with_deadline(cand_url, out_dir, 50, &ext, Some(hunt_deadline)).await;
+        let dl = stream_download_file_with_deadline(cand_url, out_dir, max_size_mb, &ext, Some(hunt_deadline)).await;
         if dl.success {
             downloaded_res = Some(dl);
             break;
@@ -1162,7 +1162,8 @@ async fn main() {
             let query = args.get(2).map(|s| s.as_str()).unwrap_or("");
             let ext = args.get(3).map(|s| s.as_str()).unwrap_or("");
             let out_dir = args.get(4).map(|s| s.as_str()).unwrap_or("./server_storage");
-            let res = hunt_files_on_web(query, ext, out_dir).await;
+            let max_mb: u64 = args.get(5).and_then(|s| s.parse().ok()).unwrap_or(100);
+            let res = hunt_files_on_web(query, ext, out_dir, max_mb).await;
             println!("{}", serde_json::to_string(&res).unwrap_or_default());
         }
         "download" => {
