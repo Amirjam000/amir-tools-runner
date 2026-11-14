@@ -1,0 +1,25 @@
+[package]
+name = "amir-rust-agent"
+version = "6.0.0"
+edition = "2021"
+description = "High-Speed Native Rust Autonomous Agent & Web File Hunter for Amir Tools Python Bot"
+
+[[bin]]
+name = "amir-rust-agent"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "gzip", "brotli"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+regex = "1"
+scraper = "0.20"
+urlencoding = "2"
+futures-util = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 4
+strip = true

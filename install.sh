@@ -1,72 +1,88 @@
 #!/usr/bin/env bash
 set -e
 
-echo "=========================================================="
-echo "🦀 نصب و راه‌اندازی خودکار ربات امیر تولز (نسخه Rust v6.0)"
-echo "=========================================================="
+echo "============================================================"
+echo "🚀 Amir Tools Hybrid (Python Core + Rust Native Agent + yt-dlp)"
+echo "🤖 Bot: @Game_iran_amir_bot | Owner: 7243980602"
+echo "============================================================"
 
-# 1. نصب پیش‌نیازهای سیستم، ffmpeg و yt-dlp
-if command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get update -y
-    sudo apt-get install -y curl git build-essential pkg-config libssl-dev ffmpeg python3-pip ca-certificates
-fi
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y curl git build-essential pkg-config libssl-dev ffmpeg python3 python3-pip python3-venv ca-certificates
 
-# نصب آخرین نسخه yt-dlp و edge-tts
-sudo curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp || true
-sudo chmod a+rx /usr/local/bin/yt-dlp || true
-pip3 install -U edge-tts --break-system-packages >/dev/null 2>&1 || pip3 install -U edge-tts >/dev/null 2>&1 || true
+# 1. Install / Update latest yt-dlp binary
+echo "📥 [1/5] Installing latest yt-dlp..."
+curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp || true
+chmod a+rx /usr/local/bin/yt-dlp || true
 
-# 2. نصب کامپایلر Rust در صورت عدم وجود
-if ! command -v cargo >/dev/null 2>&1; then
-    echo "📦 در حال نصب کامپایلر Rust..."
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    source "$HOME/.cargo/env"
-fi
-export PATH="$HOME/.cargo/bin:$PATH"
-
-# 3. کلون یا بروزرسانی سورس از مخزن
-INSTALL_DIR="$HOME/amir-tools-rust"
-if [ ! -f "Cargo.toml" ]; then
+# 2. Clone or update repository
+INSTALL_DIR="/opt/amir-tools-bot"
+echo "📦 [2/5] Syncing repository into $INSTALL_DIR..."
+if [ -d "$INSTALL_DIR/.git" ]; then
+    cd "$INSTALL_DIR"
+    git fetch --all
+    git reset --hard origin/main
+else
     rm -rf "$INSTALL_DIR"
     git clone https://github.com/Amirjam000/amir-tools-runner.git "$INSTALL_DIR"
     cd "$INSTALL_DIR"
 fi
 
-# 4. کامپایل نسخه نهایی پرسرعت (Release)
-echo "⚡ در حال کامپایل هسته Rust با حداکثر بهینه‌سازی..."
-cargo build --release
+mkdir -p "$INSTALL_DIR/server_storage"
 
-# 5. ساخت سرویس دائمی systemd (اجرای ۲۴/۷ در پس‌زمینه)
-SERVICE_FILE="/etc/systemd/system/amir-tools-rust.service"
-WORK_DIR="$(pwd)"
-BIN_PATH="$WORK_DIR/target/release/amir_tools_bot"
+# 3. Install Python dependencies (venv or system)
+echo "🐍 [3/5] Installing Python dependencies..."
+if [ ! -d "$INSTALL_DIR/venv" ]; then
+    python3 -m venv "$INSTALL_DIR/venv"
+fi
+"$INSTALL_DIR/venv/bin/pip" install --upgrade pip
+"$INSTALL_DIR/venv/bin/pip" install --upgrade -r "$INSTALL_DIR/requirements.txt" yt-dlp
 
-if [ -d "/etc/systemd/system" ]; then
-    sudo bash -c "cat > $SERVICE_FILE" <<EOF
+# 4. Create & Start systemd service immediately so Bot is LIVE right now!
+echo "⚡ [4/5] Starting Amir Tools Bot systemd service..."
+cat >/etc/systemd/system/amir-tools.service <<EOF
 [Unit]
-Description=Amir Tools Ultimate Telegram Bot (Native Rust v6.0)
-After=network.target
+Description=Amir Tools Telegram Bot (Hybrid Python + Rust Agent + yt-dlp)
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=$WORK_DIR
-ExecStart=$BIN_PATH
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/app.py
 Restart=always
 RestartSec=3
-Environment=RUST_BACKTRACE=1
+Environment="PYTHONUNBUFFERED=1"
+Environment="PATH=/usr/local/bin:/usr/bin:/bin:$HOME/.cargo/bin"
 
 [Install]
 WantedBy=multi-user.target
 EOF
-    sudo systemctl daemon-reload
-    sudo systemctl enable amir-tools-rust
-    sudo systemctl restart amir-tools-rust
-    echo "=========================================================="
-    echo "✅ ربات امیر تولز (Rust v6.0) با موفقیت نصب و در پس‌زمینه فعال شد!"
-    echo "📊 مشاهده لاگ زنده: sudo journalctl -u amir-tools-rust -f"
-    echo "=========================================================="
-else
-    echo "🚀 در حال اجرای مستقیم ربات..."
-    nohup "$BIN_PATH" > bot.log 2>&1 &
-    echo "✅ ربات در پس‌زمینه اجرا شد! (فایل لاگ: $WORK_DIR/bot.log)"
+
+systemctl daemon-reload
+systemctl enable amir-tools.service
+systemctl restart amir-tools.service
+
+echo "✅ Python Bot Core is now ONLINE and polling Telegram!"
+
+# 5. Compile Native Rust Agent Engine (amir-rust-agent)
+echo "🦀 [5/5] Compiling Native Rust Agent Engine (amir-rust-agent)..."
+if ! command -v cargo >/dev/null 2>&1; then
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 fi
+export PATH="$HOME/.cargo/bin:$PATH"
+
+if [ -d "$INSTALL_DIR/rust_agent" ]; then
+    cd "$INSTALL_DIR/rust_agent"
+    cargo build --release
+    cp -f "$INSTALL_DIR/rust_agent/target/release/amir-rust-agent" "$INSTALL_DIR/amir-rust-agent"
+    cp -f "$INSTALL_DIR/rust_agent/target/release/amir-rust-agent" "/usr/local/bin/amir-rust-agent"
+    chmod +x "$INSTALL_DIR/amir-rust-agent" "/usr/local/bin/amir-rust-agent"
+    echo "🦀 Native Rust Agent Binary compiled and activated at $INSTALL_DIR/amir-rust-agent!"
+fi
+
+echo "============================================================"
+echo "✅ INSTALLATION COMPLETE! Hybrid Python + Rust Agent is ACTIVE!"
+echo "📊 Check status: systemctl status amir-tools --no-pager"
+echo "📜 Live logs:    journalctl -u amir-tools -f"
+echo "============================================================"
