@@ -995,7 +995,7 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                         "ok": true,
                         "open": true,
                         "latency_ms": ms,
-                        "report": format!("🟢 پورت <code>{}</code> روی میزبان <code>{}</code> <b>باز (OPEN)</b> است.\n⚡️ زمان هندشیک TCP (موتور Rust): <b>{} ms</b>", port, escape_html(host_only), ms)
+                        "report": format!("🟢 پورت <code>{}</code> روی میزبان <code>{}</code> <b>باز (OPEN)</b> است.\n⚡️ زمان هندشیک TCP: <b>{} ms</b>", port, escape_html(host_only), ms)
                     })
                 }
                 _ => {
@@ -1051,7 +1051,7 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
             json!({
                 "ok": true,
                 "ips": ips,
-                "report": format!("🌐 <b>تحلیل DNS دامنه (Rust Engine):</b> <code>{}</code>\n📍 آدرس‌های IP: <code>{}</code>{}", escape_html(host_only), ip_list, rec_list)
+                "report": format!("🌐 <b>تحلیل DNS دامنه:</b> <code>{}</code>\n📍 آدرس‌های IP: <code>{}</code>{}", escape_html(host_only), ip_list, rec_list)
             })
         }
         "http" => {
@@ -1072,7 +1072,7 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                         "status": status,
                         "latency_ms": ms,
                         "report": format!(
-                            "🌐 <b>بررسی سلامت وب‌سایت (Rust Engine):</b>\n• آدرس: <code>{}</code>\n• وضعیت HTTP: <b>{} {}</b>\n• زمان پاسخ: <b>{} ms</b>\n• وب‌سرور: <code>{}</code>",
+                            "🌐 <b>بررسی سلامت وب‌سایت:</b>\n• آدرس: <code>{}</code>\n• وضعیت HTTP: <b>{} {}</b>\n• زمان پاسخ: <b>{} ms</b>\n• وب‌سرور: <code>{}</code>",
                             escape_html(&url), status, escape_html(reason), ms, escape_html(&srv)
                         )
                     })
@@ -1101,7 +1101,7 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                         return json!({
                             "ok": true,
                             "report": format!(
-                                "🌤 <b>وضعیت زنده آب‌وهوای {} (Rust Engine):</b>\n\n• 🌡 <b>دما:</b> <code>{}°C</code> (دمای محسوس: <code>{}°C</code>)\n• ☁️ <b>آسمان:</b> {}\n• 💧 <b>رطوبت:</b> <code>{}%</code>\n• 💨 <b>سرعت باد:</b> <code>{} km/h</code>",
+                                "🌤 <b>وضعیت زنده آب‌وهوای {}:</b>\n\n• 🌡 <b>دما:</b> <code>{}°C</code> (دمای محسوس: <code>{}°C</code>)\n• ☁️ <b>آسمان:</b> {}\n• 💧 <b>رطوبت:</b> <code>{}%</code>\n• 💨 <b>سرعت باد:</b> <code>{} km/h</code>",
                                 escape_html(city), escape_html(temp_c), escape_html(feels), escape_html(desc), escape_html(hum), escape_html(wind)
                             )
                         });
@@ -1125,7 +1125,7 @@ async fn rust_net_tool(mode: &str, target: &str, extra: &str) -> serde_json::Val
                         .and_then(|x| x.as_str())
                         .unwrap_or("");
                     if !extract.is_empty() {
-                        let mut rep = format!("📚 <b>دانشنامه ویکی‌پدیا ({}) [Rust Engine]:</b>\n\n{}", escape_html(title), escape_html(extract));
+                        let mut rep = format!("📚 <b>دانشنامه ویکی‌پدیا ({}):</b>\n\n{}", escape_html(title), escape_html(extract));
                         if !page_url.is_empty() {
                             rep.push_str(&format!("\n\n🔗 <a href=\"{}\">مطالعه مقاله کامل در ویکی‌پدیا</a>", escape_html(page_url)));
                         }
