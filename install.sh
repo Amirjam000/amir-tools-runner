@@ -8,12 +8,15 @@ echo "============================================================"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
-apt-get install -y curl git build-essential pkg-config libssl-dev ffmpeg python3 python3-pip python3-venv ca-certificates
+apt-get install -y curl git unzip build-essential pkg-config libssl-dev ffmpeg python3 python3-pip python3-venv ca-certificates
 
-# 1. Install / Update latest yt-dlp binary
-echo "📥 [1/5] Installing latest yt-dlp..."
+# 1. Install / Update latest yt-dlp binary & Deno JS runtime (required for YouTube EJS)
+echo "📥 [1/5] Installing latest yt-dlp & Deno JS runtime..."
 curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /usr/local/bin/yt-dlp || true
 chmod a+rx /usr/local/bin/yt-dlp || true
+if ! command -v deno >/dev/null 2>&1; then
+    curl -fsSL https://deno.land/install.sh | DENO_INSTALL="/usr/local" sh || true
+fi
 
 # 2. Clone or update repository
 INSTALL_DIR="/opt/amir-tools-bot"
@@ -36,7 +39,7 @@ if [ ! -d "$INSTALL_DIR/venv" ]; then
     python3 -m venv "$INSTALL_DIR/venv"
 fi
 "$INSTALL_DIR/venv/bin/pip" install --upgrade pip
-"$INSTALL_DIR/venv/bin/pip" install --upgrade -r "$INSTALL_DIR/requirements.txt" yt-dlp
+"$INSTALL_DIR/venv/bin/pip" install --upgrade -r "$INSTALL_DIR/requirements.txt" "yt-dlp[default]"
 echo "🌐 Installing Headless Chromium for Autonomous Browser Agent..."
 "$INSTALL_DIR/venv/bin/python" -m playwright install-deps chromium || true
 "$INSTALL_DIR/venv/bin/python" -m playwright install chromium || true
