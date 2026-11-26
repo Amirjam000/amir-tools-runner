@@ -58,6 +58,7 @@ WorkingDirectory=$INSTALL_DIR
 ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/app.py
 Restart=always
 RestartSec=3
+Environment="HOME=/root"
 Environment="PYTHONUNBUFFERED=1"
 Environment="PATH=/usr/local/bin:/usr/bin:/bin:$HOME/.cargo/bin"
 
